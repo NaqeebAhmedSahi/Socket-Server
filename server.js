@@ -14,7 +14,7 @@ const io = socketIo(server, {
     origin: [
       process.env.FRONTEND_URL,
       "http://localhost:3000",
-      "https://client-socket-five.vercel.app" 
+      "https://client-socket-1xdm.vercel.app" 
     ],
     methods: ["GET", "POST"]
   }
