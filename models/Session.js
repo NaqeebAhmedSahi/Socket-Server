@@ -4,25 +4,29 @@ const sessionSchema = new mongoose.Schema({
   pin: {
     type: String,
     required: true,
-    unique: true,
+    index: true
   },
   deviceId: {
     type: String,
-    required: true,
-  },
-  socketId: {
-    type: String,
-    default: null, // Make it optional initially
+    required: true
   },
   deviceName: {
     type: String,
-    required: true,
+    required: true
   },
-  createdAt: {
+  socketId: {
+    type: String,
+    index: true
+  },
+  lastActive: {
     type: Date,
-    default: Date.now,
-    expires: 86400, // Automatically delete after 24 hours
-  },
+    default: Date.now
+  }
+}, {
+  timestamps: true
 });
+
+// Auto-expire sessions after 24 hours
+sessionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 86400 });
 
 module.exports = mongoose.model('Session', sessionSchema);
