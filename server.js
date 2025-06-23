@@ -31,10 +31,11 @@ connectDB();
 app.use('/api/auth', authRoutes);
 
 // Socket.io connection
+// Enhanced socket.io connection handler
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
- socket.on('register-pin', async ({ pin, deviceId, deviceName }) => {
+  socket.on('register-pin', async ({ pin, deviceId, deviceName }) => {
     try {
       // Find existing session for this PIN
       const existingSession = await Session.findOne({ pin });
@@ -47,12 +48,19 @@ io.on('connection', (socket) => {
       // If same device but different socket (new tab/window)
       if (existingSession.deviceId === deviceId) {
         if (existingSession.socketId && existingSession.socketId !== socket.id) {
-          // Notify previous socket to logout
-          io.to(existingSession.socketId).emit('force-logout', {
-            message: 'Logged out from same device - new session',
-            newDevice: deviceName,
-            isSameDevice: true
-          });
+          // Get the previous socket instance
+          const prevSocket = io.sockets.sockets.get(existingSession.socketId);
+          
+          if (prevSocket) {
+            prevSocket.emit('force-logout', {
+              message: 'Logged out from same device - new session',
+              newDevice: deviceName,
+              isSameDevice: true
+            });
+            
+            // Close the previous connection
+            prevSocket.disconnect(true);
+          }
         }
 
         // Update session with new socket ID
@@ -68,20 +76,23 @@ io.on('connection', (socket) => {
 
       // Different device - handle auto-logout
       if (existingSession.socketId) {
-        // Get the previous device's socket
-        const previousSocket = io.sockets.sockets.get(existingSession.socketId);
+        // Get the previous socket instance
+        const prevSocket = io.sockets.sockets.get(existingSession.socketId);
         
-        if (previousSocket) {
+        if (prevSocket) {
           // Send force-logout to previous device
-          previousSocket.emit('force-logout', {
+          prevSocket.emit('force-logout', {
             message: 'Logged out from another device',
             newDevice: deviceName,
             isSameDevice: false,
             newDeviceDetails: { deviceId, deviceName }
           });
-
-          // Wait a moment to ensure message is delivered
-          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Close the previous connection
+          prevSocket.disconnect(true);
+          
+          // Wait briefly to ensure message is delivered
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
 
@@ -96,7 +107,8 @@ io.on('connection', (socket) => {
         isSameDevice: false,
         previousDevice: existingSession.deviceName
       });
-          } catch (error) {
+
+    } catch (error) {
       console.error('Socket registration error:', error);
       socket.emit('error', { message: 'Error registering PIN' });
     }

@@ -6,18 +6,11 @@ const Session = require('../models/Session');
 router.post('/verify-pin', async (req, res) => {
   const { pin, deviceId, deviceName } = req.body;
 
-  if (!pin || !deviceId || !deviceName) {
-    return res.status(400).json({
-      success: false,
-      message: 'Missing required fields'
-    });
-  }
-
   try {
     const existingSession = await Session.findOne({ pin });
 
     if (existingSession) {
-      // If same device, we'll handle the socket update in the socket.io handler
+      // If same device, we'll handle socket update in socket.io
       if (existingSession.deviceId === deviceId) {
         return res.status(200).json({
           success: true,
@@ -27,11 +20,21 @@ router.post('/verify-pin', async (req, res) => {
         });
       }
 
-      // For different device, delete old session first
+      // For different device, force logout previous session
+      if (existingSession.socketId) {
+        const io = req.app.get('socketio');
+        io.to(existingSession.socketId).emit('force-logout', {
+          message: 'Logged out from another device',
+          newDevice: deviceName,
+          isSameDevice: false
+        });
+      }
+
+      // Remove old session
       await Session.deleteOne({ pin });
     }
 
-    // Create new session (socketId will be added later)
+    // Create new session
     const newSession = new Session({
       pin,
       deviceId,
