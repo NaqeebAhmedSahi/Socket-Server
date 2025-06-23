@@ -25,6 +25,8 @@ const activeSessions = new Map();
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/auth', authRoutes);
+
 // Socket.io connection handler
 io.on('connection', (socket) => {
   console.log(`New connection: ${socket.id}`);
